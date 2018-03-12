@@ -1,0 +1,61 @@
+{
+  "name": "css-grid",
+  "version": "0.0.1",
+  "description": "A limited experimental CSS grid polyfill for Internet Explorer 11.",
+  "main": "dist/css-grid.js",
+  "directories": {
+    "test": "test"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "babel-core": "^6.9.1",
+    "babel-istanbul-loader": "^0.1.0",
+    "babel-loader": "^6.2.4",
+    "babel-preset-latest": "^6.24.1",
+    "clone": "^2.1.0",
+    "del": "^2.2.0",
+    "gulp": "^3.9.1",
+    "gulp-babel": "^6.1.2",
+    "gulp-jsdoc-to-markdown": "^1.2.2",
+    "gulp-jshint": "^2.0.0",
+    "gulp-rename": "^1.2.2",
+    "jasmine-core": "^2.4.1",
+    "jshint": "^2.9.2",
+    "karma": "^1.1.0",
+    "karma-chrome-launcher": "^1.0.1",
+    "karma-coverage": "^1.0.0",
+    "karma-coveralls": "^1.1.2",
+    "karma-es6-shim": "^1.0.0",
+    "karma-firefox-launcher": "^1.0.0",
+    "karma-jasmine": "^1.0.2",
+    "karma-jasmine-ajax": "^0.1.13",
+    "karma-jasmine-jquery": "^0.1.1",
+    "karma-sauce-launcher": "^1.1.0",
+    "karma-spec-reporter": "^0.0.26",
+    "karma-webpack": "^1.7.0",
+    "require-dir": "^0.3.0",
+    "vinyl-paths": "^2.1.0",
+    "webpack": "^2.1.0-beta.25",
+    "webpack-dev-server": "^1.14.1",
+    "webpack-node-externals": "^1.5.4",
+    "webpack-stream": "^3.2.0"
+  },
+  "scripts": {
+    "test": "gulp lint && gulp test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com//svenvandescheur/css-grid-polyfill.git"
+  },
+  "keywords": [
+      "CSS",
+      "grid",
+      "polyfill"
+  ],
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/svenvandescheur/css-grid-polyfill/issues"
+  },
+  "homepage": "https://github.com//svenvandescheur/css-grid-polyfill"
+}

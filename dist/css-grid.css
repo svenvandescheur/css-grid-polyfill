@@ -1,0 +1,36 @@
+.row {
+    grid-template-columns: auto auto auto auto auto auto auto auto auto auto auto auto;
+    grid-column-gap: 50px;
+    grid-row-gap: 25px;
+
+    background: blue;
+    display: grid;
+    margin-bottom: 50px;
+    width: 100%;
+}
+
+.column {
+    grid-colum: span 1;
+    background: green;
+    border: solid 1px yellow;
+}
+
+.column--cs3 {
+    grid-column: span 3;
+}
+
+.column--cs4 {
+    grid-column: span 4;
+}
+
+.column--cs6 {
+    grid-column: span 6;
+}
+
+.column--cs12 {
+    grid-column: span 12;
+}
+
+.column--rs3 {
+    grid-row: span 3;
+}
