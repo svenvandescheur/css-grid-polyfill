@@ -1,5 +1,9 @@
 # CSS grid polyfill
 
+![screenshot](https://github.com/svenvandescheur/css-grid-polyfill/raw/master/screenshot.jpg "screenshot")
+
+
+
 # Note:
 
 > This polyfill is development, highly experimental and not feature complete.
