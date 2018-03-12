@@ -2,8 +2,6 @@
 
 ![screenshot](https://github.com/svenvandescheur/css-grid-polyfill/raw/master/screenshot.jpg "screenshot")
 
-
-
 # Note:
 
 > This polyfill is development, highly experimental and not feature complete.
@@ -41,7 +39,7 @@ No tests are available at this time :(, once they are the can be ran using `gulp
 
 ## Contributing
 
-Pull requests and stars are always welcome. For bugs and feature requests, [please create an issue](https://github.com/maykinmedia/bem.js/issues).
+Pull requests and stars are always welcome. For bugs and feature requests, [please create an issue](https://github.com/svenvandescheur/css-grid-polyfill/issues).
 
 ## Author
 
