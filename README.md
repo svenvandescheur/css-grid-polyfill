@@ -30,7 +30,7 @@ live-server
 
 ## Development
 
-Code lives in `src` directory and can be build with `gulp build`. Documentation (update using `gulp jsdoc` is available in `doc` directory.
+Code lives in `src` directory and can be build with `gulp build`. Documentation (update using `gulp jsdoc`) is available in `doc` directory.
 
 
 ## Running tests
