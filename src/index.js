@@ -18,8 +18,16 @@ class Polyfill {
      * @returns {AST}
      */
     createAST() {
-        let rules = [].map.call(this.stylesheet.rules, (css => new Rule(css)))
+        let rules = [].filter.call(this.stylesheet.rules, rule => rule.constructor !== CSSMediaRule)
+            .map(css => new Rule(css))
             .filter(rule => rule.isGridRelated());
+
+        [].filter.call(this.stylesheet.rules, rule => rule.constructor === CSSMediaRule)
+            .forEach(mediaRule => {
+                [].forEach.call(mediaRule.cssRules, css => {
+                    rules.push(new Rule(css, mediaRule));
+               });
+            });
         return new AST(rules);
     }
 
@@ -273,7 +281,7 @@ class RuleNode {
      */
     constructor(rule, node) {
         /** {Rule} */
-        this.rule = new Rule(rule.css);
+        this.rule = new Rule(rule.css, rule.mediaRule);
 
         /** {HTMLElement} */
         this.node = node;
@@ -288,11 +296,13 @@ class RuleNode {
 class Rule {
     /**
      * Constructor method.
-     * @param {string} css
+     * @param {CSSStyleRule} css The CSSStyleRule containing parsable CSS.
+     * @param {CSSMediaRule} mediaRule CSSMediaRule allowing to determine when to activate this rule.
      */
-    constructor(css) {
+    constructor(css, mediaRule) {
         let data = this.parseCSS(css);
         this.css = css;
+        this.mediaRule = mediaRule;  // TODO: Implement media query evaluation.
         this.selector = data.selector;
         this.nodes = document.querySelectorAll(this.selector);
         this.rules = data.rules;
@@ -301,7 +311,7 @@ class Rule {
 
     /**
      * Parses a
-     * @param rule
+     * @param {CSSStyleRule} css
      * @returns {Rule}
      */
     parseCSS(rule) {
