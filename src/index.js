@@ -1,3 +1,6 @@
+import enquire from "enquire.js";
+
+
 /**
  * Main polyfill class.
  * @class
@@ -7,7 +10,28 @@ class Polyfill {
      * Constructor method.
      */
     constructor() {
+        /** {CSSStyleSheet} */
         this.stylesheet = document.styleSheets[0];
+
+        /** {AST|null} */
+        this.ast = null;
+
+        this.bindEvents();
+        this.update();
+    }
+
+    /**
+     * Binds events to callbacks.
+     */
+    bindEvents() {
+        window.addEventListener('resize', this.update.bind(this));
+    }
+
+    /**
+     * Updates the polyfill.
+     * FIXME: Update not working correctly (resize vs refresh).
+     */
+    update() {
         this.ast = this.createAST();
         this.apply();
     }
@@ -18,24 +42,27 @@ class Polyfill {
      * @returns {AST}
      */
     createAST() {
-        let rules = [].filter.call(this.stylesheet.rules, rule => rule.constructor !== CSSMediaRule)
+        let rules = [].filter.call(this.stylesheet.rules, rule => !rule.parentRule && rule.type === CSSRule.STYLE_RULE)
             .map(css => new Rule(css))
             .filter(rule => rule.isGridRelated());
 
-        [].filter.call(this.stylesheet.rules, rule => rule.constructor === CSSMediaRule)
+        [].filter.call(this.stylesheet.cssRules, rule => rule.type === 4)
             .forEach(mediaRule => {
                 [].forEach.call(mediaRule.cssRules, css => {
                     rules.push(new Rule(css, mediaRule));
-               });
+                });
             });
         return new AST(rules);
     }
+
+
+
 
     /**
      * Builds the grid based on this.ast.
      */
     apply() {
-        console.log(this.ast);
+        console.log('GENERATED AST', this.ast);
         let containers = this.ast.tree;
 
 
@@ -71,10 +98,10 @@ class Polyfill {
 
             // Generates code based on AST leaves.
             // This loop takes care of column placement.
-            container.tree.forEach((item, index) => {
+            container.tree.forEach((ruleNode, index) => {
                 // Item specific variables.
                 let itemColumnObject = containerColumns[index] || {width: 'auto'};
-                let itemColSpan = item.rule.meta.colSpan || 1;
+                let itemColSpan = ruleNode.rule.meta.colSpan || 1;
                 let itemWidth;
 
 
@@ -108,22 +135,22 @@ class Polyfill {
                 if (!rows[rowIndex]) {
                     rows[rowIndex] = [];
                 }
-                rows[rowIndex].push(item);
+                rows[rowIndex].push(ruleNode);
 
 
                 // Apply items styles.
-                item.node.style.position = 'absolute';
-                item.node.style.width = itemWidth + 'px';
-                item.node.style.left = columnCursor + 'px';
-                item.node.style.top = rowCursor + 'px';
+                ruleNode.node.style.position = 'absolute';
+                ruleNode.node.style.width = itemWidth + 'px';
+                ruleNode.node.style.left = columnCursor + 'px';
+                ruleNode.node.style.top = rowCursor + 'px';
 
 
                 // Update cursors.
-                columnCursor += item.node.clientWidth + containerGutterWidth;
+                columnCursor += ruleNode.node.clientWidth + containerGutterWidth;
 
 
                 // Rowspan
-                let rowSpan = Math.max(item.rule.meta.rowSpan - 1 || 0, 0);
+                let rowSpan = Math.max(ruleNode.rule.meta.rowSpan - 1 || 0, 0);
 
                 if (rowSpan) {
                     rowSpans.push({index, rowSpan, itemWidth});
@@ -181,14 +208,13 @@ class AST {
      */
     constructor(rules) {
         /** {Rules[]} */
-        this.rules = rules;
+        this.rules = rules.filter(rule => rule.isApplicable());
 
         /** {RuleNode[] */
         this.ruleNodes = [...this.getRuleNodes(this.getContainerRules()), ...this.getRuleNodes(this.getItemRules())];
 
+        /** {RuleNode[] */
         this.tree = this.buildTree();
-
-
     }
 
     /**
@@ -236,10 +262,13 @@ class AST {
 
             [].forEach.call(nodes, node => {
                 let rNode = new RuleNode(rule, node);
+
                 let existing = ruleNodes.filter(rn => rn.node === node)[0];
                 if (existing) {
                     for (let key in rNode.rule.meta) {
-                        existing.rule.meta[key] = rNode.rule.meta[key];
+                        if (rNode.rule.meta[key]) {
+                            existing.rule.meta[key] = rNode.rule.meta[key];
+                        }
                     }
                 } else {
                     ruleNodes.push(rNode);
@@ -302,7 +331,7 @@ class Rule {
     constructor(css, mediaRule) {
         let data = this.parseCSS(css);
         this.css = css;
-        this.mediaRule = mediaRule;  // TODO: Implement media query evaluation.
+        this.mediaRule = mediaRule;
         this.selector = data.selector;
         this.nodes = document.querySelectorAll(this.selector);
         this.rules = data.rules;
@@ -442,6 +471,35 @@ class Rule {
     isGridRelated() {
         return this.isDisplayGrid() || !!Object.keys(this.rules)
             .filter(key => key.match(/^grid/)).length;
+    }
+
+    /**
+     * Returns whether this rule is applicable to the current state of the browser.
+     * This takes media queries into account.
+     * @returns {boolean}
+     */
+    isApplicable() {
+        if (this.mediaRule) {
+            return this.evaluateMediaRule();
+        }
+        return true;
+    }
+
+    /**
+     * Evaluates this.mediaRule using enquire.js.
+     * @returns {boolean}
+     */
+    evaluateMediaRule() {
+        let result = null;
+        let mq = this.mediaRule.cssText.match(/media.+(?=\s+{)/g);
+        if (mq[0]) {
+            mq = mq[0].replace('media ', '');
+            enquire.register(mq, {
+                match: () => result = true,
+                unmatch: () => result = false
+            });
+            return result;
+        }
     }
 }
 

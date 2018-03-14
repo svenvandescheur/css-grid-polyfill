@@ -6,7 +6,9 @@
   "directories": {
     "test": "test"
   },
-  "dependencies": {},
+  "dependencies": {
+    "enquire.js": "^2.1.6"
+  },
   "devDependencies": {
     "babel-core": "^6.9.1",
     "babel-istanbul-loader": "^0.1.0",
@@ -48,9 +50,9 @@
     "url": "git+https://github.com//svenvandescheur/css-grid-polyfill.git"
   },
   "keywords": [
-      "CSS",
-      "grid",
-      "polyfill"
+    "CSS",
+    "grid",
+    "polyfill"
   ],
   "author": "",
   "license": "MIT",

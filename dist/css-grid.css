@@ -9,7 +9,7 @@
     width: 100%;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 900px) {
     .row {
         grid-template-columns: auto auto auto auto auto auto auto auto auto auto auto auto;
     }
@@ -37,6 +37,8 @@
     grid-column: span 12;
 }
 
-.column--rs3 {
-    grid-row: span 3;
+@media (min-width: 900px) {
+    .column--rs3 {
+        grid-row: span 3;
+    }
 }
