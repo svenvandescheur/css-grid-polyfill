@@ -1,5 +1,6 @@
-import enquire from "enquire.js";
-
+import enquire from 'enquire.js';
+import jsonQuotes from 'json-quotes';
+import sortSpecificity from 'sort-specificity';
 
 /**
  * Main polyfill class.
@@ -52,6 +53,10 @@ class Polyfill {
                     rules.push(new Rule(css, mediaRule));
                 });
             });
+
+        rules.sort((a, b) => sortSpecificity([a.selector, b.selector]))
+            // .reverse();
+
         return new AST(rules);
     }
 
@@ -66,127 +71,197 @@ class Polyfill {
         let containers = this.ast.tree;
 
 
-        // Generates code based on AST branches.
-        // This loop takes care of containers.
+        //
+        // Process each grid container.
+        //
+
         containers.forEach(container => {
             let node = container.node;
 
+
+            //
+            // Build abstract grid
+            //
+
+            let columns = container.rule.meta.columns.length;
+            let item = container.tree[0];
+            let pregrid = [[]];
+            let pregridRow = 0;
+
+
+            //
+            // Step 1: Start building grid.
+            //
+            // Adds columns to two-dimensional array representing grid layout.
+            // Every item with a colspan > 1 adds "false" cells to pregrid.
+            // These tell the renderer to skip a grid position.
+            //
+            container.tree.forEach(item => {
+                let empty = false;
+                let colSpan = parseInt(item.rule.meta.colSpan) || 1;
+
+                // Add empty "false" cells.
+                while (colSpan) {
+                    pregrid[pregridRow].push(empty ? false : item);
+                    colSpan--;
+                    empty = true;
+                }
+
+                // Create neext row.
+                if (pregrid[pregridRow].length >= columns) {
+                    pregridRow++;
+                    pregrid[pregridRow] = [];
+                }
+            });
+
+            //
+            // Step 2: Deal with rowspan.
+            //
+            // Inserts "false" cells on colspan position on rows affected by rowspan starting on the correct column index.
+            // Overflowing cells are moved to the next row.
+            //
+            pregrid.forEach((row, rowIndex) => {
+                row.forEach((column, colIndex) => {
+                    if (column === false) { return; }
+                    let rowSpan = parseInt(column.rule.meta.rowSpan) || 1;
+                    if (rowSpan <= 1) { return };
+
+                    for (let i=1; i<rowSpan; i++) {
+                        let processingRow = pregrid[rowIndex + i];
+                        if (!processingRow) { return };
+
+                        //  Inserts "false" cells on colspan position on rows affected by rowspan starting on the correct column index.
+                        let colSpan = parseInt(column.rule.meta.colSpan) || 1;
+                        for (let i=1; i<=colSpan; i++) {
+                            processingRow.splice(colIndex, 0, false);
+                        }
+
+                        // Overflowing cells are moved to the next row.
+                        let moved = processingRow.splice(-1 * colSpan);
+                        if (moved.length) {
+                            // Find or create next row.
+                            let nextProcessingRow = pregrid[rowIndex + i + 1];
+                            if (!nextProcessingRow) {
+                                pregrid.push([]);
+                                nextProcessingRow = pregrid[rowIndex + i + 1];
+                            }
+
+                            // Add overflowing cells to next row.
+                            nextProcessingRow.unshift(...moved);
+                        }
+                    }
+                });
+
+                //
+                // Step 3: Final cleanup.
+                //
+                // Preforms another overflow check ov the entire pregrid.
+                //
+                pregrid.forEach((processingRow, rowIndex) => {
+                    let over = columns - processingRow.length;
+
+                    if (over) {
+                        let moved = processingRow.splice(-1 * over + 1);
+
+                        if (moved.length) {
+                            let nextProcessingRow = pregrid[rowIndex + 1];
+
+                            if (!nextProcessingRow) {
+                                pregrid.push([]);
+                                nextProcessingRow = pregrid[rowIndex + 1];
+                            }
+
+                            nextProcessingRow.unshift(...moved);
+                        }
+                    }
+                });
+            });
+
+
+            //
             // Apply container styles.
+            //
+
+            // Update container width if nost set.
             let position = node.style.position.toLowerCase();
             if (position === '' || position === 'static') {
                 node.style.position = 'relative';
             }
-
-
-            // Container specific variables.
-            let containerColumns = container.rule.meta.columns;
-            let containerColumnCount = container.rule.meta.columns.length;
-            let containerTotalWidth = container.node.clientWidth;
-            let containerGutterWidth = (parseInt(container.rule.meta.colGap) || 0);
-            let containerGutterHeight = (parseInt(container.rule.meta.rowGap) || 0);
-            let containerTotalGutterWidth = containerGutterWidth * (containerColumnCount - 1);
-            let containerColumnWidth = (containerTotalWidth - containerTotalGutterWidth) / containerColumnCount;
-
-
-            // Cursors.
-            let columnCursor = 0;
-            let rowCursor = 0;
-            let rowIndex = 0;
-            let rowSpans = [];
-            let rows = [];
-
-
-            // Generates code based on AST leaves.
-            // This loop takes care of column placement.
-            container.tree.forEach((ruleNode, index) => {
-                // Item specific variables.
-                let itemColumnObject = containerColumns[index] || {width: 'auto'};
-                let itemColSpan = ruleNode.rule.meta.colSpan || 1;
-                let itemWidth;
-
-
-                // Calculate width.
-                if (itemColumnObject.width === 'auto') {
-                    let gutters = Math.max(itemColSpan - 1, 0) * containerGutterWidth;
-                    itemWidth = containerColumnWidth * itemColSpan + gutters;
-                } else {
-                    itemWidth = parseInt(itemColumnObject.width);
-                }
-
-
-                // Check if we need to continue to the next row.
-                let columnIndex = (rows[rowIndex]) ? rows[rowIndex].length : 0;
-                let skipped = rowSpans.filter(rSpan => rSpan.index === columnIndex && rSpan.rowSpan > 0)[0];
-                let skippedWidth = (skipped) ? skipped.itemWidth + containerGutterWidth : 0;
-                let nextLeft = columnCursor - containerGutterWidth + itemWidth + skippedWidth;
-
-                if (nextLeft > containerTotalWidth) {
-                    let tallestColumn = this.getTallestRuleNode(rows[rowIndex]).node.clientHeight;
-                    columnCursor = 0;
-                    rowCursor += tallestColumn + containerGutterHeight;
-                    rowIndex++;
-                }
-                if (skipped) {
-                    skipped.rowSpan--;
-                }
-
-
-                // Add item to row
-                if (!rows[rowIndex]) {
-                    rows[rowIndex] = [];
-                }
-                rows[rowIndex].push(ruleNode);
-
-
-                // Apply items styles.
-                ruleNode.node.style.position = 'absolute';
-                ruleNode.node.style.width = itemWidth + 'px';
-                ruleNode.node.style.left = columnCursor + 'px';
-                ruleNode.node.style.top = rowCursor + 'px';
-
-
-                // Update cursors.
-                columnCursor += ruleNode.node.clientWidth + containerGutterWidth;
-
-
-                // Rowspan
-                let rowSpan = Math.max(ruleNode.rule.meta.rowSpan - 1 || 0, 0);
-
-                if (rowSpan) {
-                    rowSpans.push({index, rowSpan, itemWidth});
-                }
-            });
-
-
-            // Generates code based on generated rows.
-            // This loop takes care of row span.
-            rows.forEach((row, rowIndex) => {
-                row.forEach((column) => {
-                    let rowsToCheck = Math.max(column.rule.meta.rowSpan - 1 || 0, 0);
-
-                    if (!rows[rowIndex + 1]) {
-                        return;
-                    }
-
-                    let guttersHeight = rowsToCheck * parseInt(container.rule.meta.rowGap);
-                    let clientHeight = column.node.clientHeight + guttersHeight;
-
-                    for (let i = 1; i <= rowsToCheck; i++) {
-                        let nextRow = rows[rowIndex + i];
-
-                        if (nextRow) {
-                            clientHeight += this.getTallestRuleNode(nextRow).node.clientHeight;
-                        }
-                    }
-                    column.node.style.height = clientHeight + 'px';
-                });
-
-
-            });
-
+            node.style.display = 'block';
 
             // Update the container height based on the contents.
             container.node.style.height = container.node.scrollHeight + 'px';
+
+
+            //
+            // Apply items styles.
+            //
+
+            let containerWidth = container.node.clientWidth;
+            let colGap = parseInt(container.rule.meta.colGap) || 0;
+            let colGapSum = (columns - 1) * colGap
+            let rowGap = parseInt(container.rule.meta.rowGap) || 0;
+            let columnWidth = (containerWidth - colGapSum) / columns;
+            let top = 0;
+
+
+            //
+            // Step 1: Render grid items.
+            //
+            // Start with rendering the columns on rows with colspan taken into account.
+            // The result should be a grid with cells positioned properly but with a non calculated height.
+            //
+
+            pregrid.forEach((row, rowIndex) => {
+                // Columns
+                row.forEach((column, columnIndex) => {
+                    if (column === false) {
+                        return;
+                    }
+
+                    let colSpan = parseInt(column.rule.meta.colSpan) || 1;
+                    let left = columnIndex * columnWidth + columnIndex * colGap;
+                    let width =  colSpan * columnWidth + (colSpan - 1) * colGap;
+                    console.log(column)
+                    column.node.style.position = 'absolute';
+                    column.node.style.top = top + 'px';
+                    column.node.style.left = left + 'px';
+                    column.node.style.width = width + 'px';
+                });
+
+                // Rows
+                row.height = row.reduce((acc, val) => Math.max(acc, val ? val.node.clientHeight : 0), 0);
+                top += row.height + rowGap;
+            });
+
+
+            //
+            // Step 2: Set cell heights.
+            //
+            // The height of cells is dependent on the colspan and the height of these rows.
+            // The latter is unknown at the time of the initial render.
+            // An additonal update is therefore requied.
+            //
+
+            pregrid.forEach((row, rowIndex) => {
+                // Columns
+                row.forEach((column, columnIndex) => {
+                    if (column === false) {
+                        return;
+                    }
+
+                    let height = 0;
+                    let rowSpan = parseInt(column.rule.meta.rowSpan) || 1;
+
+                    for (let i=0; i<rowSpan; i++) {
+                        let processingRow = pregrid[rowIndex + i];
+                        height += processingRow.height + rowGap;
+                    };
+                    height -= rowGap;
+
+                    column.node.style.height = column.node.style.height || height + 'px';
+                });
+            });
         });
     }
 
@@ -207,6 +282,7 @@ class AST {
      * @param {Rule} rules
      */
     constructor(rules) {
+        console.log(rules.map(rule => rule.selector))
         /** {Rules[]} */
         this.rules = rules.filter(rule => rule.isApplicable());
 
@@ -246,7 +322,7 @@ class AST {
      * @returns {Rule[]}
      */
     getItemRuleNodes() {
-        return this.ruleNodes.filter(ruleNode => !ruleNode.rule.isDisplayGrid());
+        return this.ruleNodes.filter(ruleNode => !ruleNode.rule.isDisplayGrid() && ruleNode.rule.isGridRelated());
     }
 
     /**
@@ -344,20 +420,26 @@ class Rule {
      * @returns {Rule}
      */
     parseCSS(rule) {
+        let rules = {};
         let split = rule.cssText.split('{');
         let selector = split[0].trim();
-        let rules = split[1]
-            .replace(/([^:;]+)/g, '"$1"')
-            .replace(/;/g, ',')
-            .replace(/\s*?"\s+?/g, '"')
-            .replace(/,"}"$/g, '}');
+        let cssRules = split[1]
+            .split(';')
+            .forEach(rule => {
+                let [key, value] = rule.split(':')
+                if (!value) {
+                    return;
+                }
 
-        rules = JSON.parse('{' + rules);
+                value = value.trim();
+                rules[key.trim()] = value;
+            });
 
-        return {
+        let result = {
             selector,
             rules
         };
+        return result;
     }
 
     /**
@@ -430,7 +512,6 @@ class Rule {
                 this.meta.colGap = split[1];
             }
         }
-
         else if (cssText) {
             let key = (property.match('column') ? 'colGap' : 'rowGap');
             this.meta[key] = cssText;
@@ -438,7 +519,7 @@ class Rule {
     }
 
     /**
-     * Parses "grid-column" and "grid-row".
+     * rs "grid-column" and "grid-row".
      * Adds "colSpan" and "rowSpan" to meta.
      * @param {string} property
      */
@@ -504,6 +585,7 @@ class Rule {
 }
 
 
-// if(navigator.userAgent.toLowerCase().match('trident')) {
-new Polyfill();
-// }
+// Start!
+if(navigator.userAgent.toLowerCase().match('trident')) {
+    new Polyfill();
+}

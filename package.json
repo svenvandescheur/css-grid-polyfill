@@ -7,7 +7,9 @@
     "test": "test"
   },
   "dependencies": {
-    "enquire.js": "^2.1.6"
+    "enquire.js": "^2.1.6",
+    "json-quotes": "^1.0.0",
+    "sort-specificity": "^1.0.1"
   },
   "devDependencies": {
     "babel-core": "^6.9.1",
